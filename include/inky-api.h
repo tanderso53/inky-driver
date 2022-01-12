@@ -100,11 +100,11 @@ extern "C" {
 /* Typical kernel callbacks */
 	typedef inky_error_state (*inky_user_delay)(UINT16_t);
 
-/* inky_user_spi_write
-   :param UINT8_t buf: ptr to buffer to write
-   :param UINT32_t len: length of buffer to write
-*/
-	typedef inky_error_state (*inky_user_spi_write)(UINT8_t*, UINT32_t);
+/** @brief inky_user_spi_write
+ *  @param buf ptr to buffer to write
+ *  @param len length of buffer to write
+ */
+	typedef inky_error_state (*inky_user_spi_write)(const UINT8_t*, UINT32_t);
 
 /* inky_user_spi_write_16
    :param UINT16_t buf: ptr to buffer to write

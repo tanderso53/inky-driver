@@ -47,7 +47,7 @@ static struct _display_res {
  * @p data Data to send on bus
  */
 static inky_error_state _spi_send_data(inky_config *cfg,
-				       UINT8_t *data,
+				       const UINT8_t *data,
 				       UINT32_t len);
 
 /** @brief send command with optional data through spi bus
@@ -56,14 +56,20 @@ static inky_error_state _spi_send_data(inky_config *cfg,
  */
 static inky_error_state _spi_send_command(inky_config *cfg,
 					  dcommand cmd,
-					  UINT8_t *data,
+					  const UINT8_t *data,
 					  UINT32_t len);
+
+static inky_error_state _spi_send_command_byte(inky_config *cfg,
+					       dcommand cmd,
+					       UINT8_t arg);
 
 static inky_error_state _reset(inky_config *cfg);
 
 static inky_error_state _busy_wait(inky_config *cfg);
 
 static inky_error_state _allocate_fb(inky_config *cfg);
+
+static UINT8_t* _spi_order_bytes(UINT16_t input, UINT8_t* result);
 
 /*
 **********************************************************************
@@ -194,6 +200,74 @@ inky_error_state inky_fb_set_pixel(inky_config *cfg, UINT8_t x,
 
 inky_error_state inky_update(inky_config *cfg)
 {
+	inky_error_state ret;
+	UINT8_t *height_byte_array = NULL;
+
+	if ((ret = _reset(cfg))) {
+		return ret;
+	}
+
+	_spi_order_bytes(cfg->fb->height, height_byte_array);
+
+	/* Use command sequence from Pimoroni's Inky library */
+	_spi_send_command_byte(cfg, ANALOG_BLOCK_CONTROL, 0x54);
+	_spi_send_command_byte(cfg, DIGITAL_BLOCK_CONTROL, 0x3b);
+	_spi_send_command(cfg, GATE_SETTING, height_byte_array, 3);
+	_spi_send_command_byte(cfg, GATE_DRIVING_VOLTAGE, 0x17);
+	_spi_send_command(cfg, SOURCE_DRIVING_VOLTAGE,
+			  (UINT8_t[]) {0x41, 0xac, 0x32}, 3);
+	_spi_send_command_byte(cfg, DUMMY_LINE_PERIOD, 0x07);
+	_spi_send_command_byte(cfg, GATE_LINE_WIDTH, 0x04);
+	_spi_send_command_byte(cfg, DATA_ENTRY_MODE, 0x03);
+	_spi_send_command_byte(cfg, VCOM_REGISTER, 0x3c);
+	_spi_send_command_byte(cfg, GS_TRANSITION_DEFINE, 0x00);
+
+	if (cfg->color->yellow) {
+		_spi_send_command(cfg, SOURCE_DRIVING_VOLTAGE,
+				  (UINT8_t[]) {0x07, 0xac, 0x32},
+				  3);
+	}
+
+	if (cfg->color->red && (cfg->pdt == INKY_WHAT)) {
+		_spi_send_command(cfg, SOURCE_DRIVING_VOLTAGE,
+				  (UINT8_t[]) {0x30, 0xac, 0x22},
+				  3);
+	}
+
+	/* Support for different update modes will be added later */
+	switch (cfg->fb->fb_type) {
+	case REFRESH_ALWAYS:
+		if (cfg->color->yellow) {
+			_spi_send_command(cfg, SET_LUTS,
+					  lut_yellow_refresh,
+					  sizeof(lut_yellow_refresh));
+		} else if (cfg->color->red) {
+			_spi_send_command(cfg, SET_LUTS,
+					  lut_red_refresh,
+					  sizeof(lut_red_refresh));
+		}
+		else {
+			_spi_send_command(cfg, SET_LUTS,
+					  lut_black_refresh,
+					  sizeof(lut_black_refresh));
+		}
+
+		break;
+	default:
+		return NOT_AVAILABLE;
+		break;
+	}
+
+	/* Set ram X and Y  start and end */
+	_spi_send_command(cfg, RAM_X_RANGE,
+			  (UINT8_t[]) {0x00, (cfg->fb->width / 8) - 1},
+			  2);
+	_spi_send_command(cfg, RAM_Y_RANGE, height_byte_array, 4);
+
+	/* Write the framebuffer to the display */
+	_spi_send_command_byte(cfg, RAM_X_PTR_START, 0x00);
+	_spi_send_command(cfg, RAM_Y_PTR_START,
+			  (UINT8_t[]) {0x00, 0x00}, 2);
 }
 
 inky_error_state inky_update_by_mode(inky_config *cfg,
@@ -202,15 +276,14 @@ inky_error_state inky_update_by_mode(inky_config *cfg,
 }
 
 static inky_error_state _spi_send_data(inky_config *cfg,
-				       UINT8_t *data,
+				       const UINT8_t *data,
 				       UINT32_t len)
 {
 	return cfg->spi_write_cb(data, len);
 }
 
-static inky_error_state _spi_send_command(inky_config *cfg,
-					  dcommand cmd, UINT8_t *data,
-					  UINT32_t len)
+static inky_error_state _spi_send_command(inky_config *cfg, dcommand cmd,
+					  const UINT8_t *data, UINT32_t len)
 {
 	inky_error_state ret;
 
@@ -226,6 +299,22 @@ static inky_error_state _spi_send_command(inky_config *cfg,
 	}
 
 	return OK;
+}
+
+static inky_error_state _spi_send_command_byte(inky_config *cfg,
+					       dcommand cmd,
+					       UINT8_t arg)
+{
+	inky_error_state ret;
+
+	ret = cfg->spi_write_cb((UINT8_t*) &cmd, 1);
+
+	if (ret != OK) {
+		return ret;
+	}
+
+	ret = _spi_send_data(cfg, &arg, 1);
+	return ret;
 }
 
 static inky_error_state _reset(inky_config *cfg)
@@ -316,4 +405,21 @@ static inky_error_state _allocate_fb(inky_config *cfg)
 	cfg->active_fb = NULL;
 
 	return OK;
+}
+
+static UINT8_t* _spi_order_bytes(UINT16_t input, UINT8_t* result) {
+	UINT8_t height_byte_little;
+	UINT8_t height_byte_big;
+
+	/* Fit 16bit heights into 8bit message stream */
+	height_byte_little = (UINT8_t) (input & 0x00FF);
+	height_byte_big = (UINT8_t) ((input >> 2) & 0x00FF);
+
+	/* Must free later */
+	result = malloc(2);
+
+	result[0] = height_byte_big;
+	result[1] = height_byte_little;
+
+	return result;
 }

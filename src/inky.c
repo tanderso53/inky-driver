@@ -275,6 +275,12 @@ inky_error_state inky_update_by_mode(inky_config *cfg,
 {
 }
 
+/*
+**********************************************************************
+************************* INTERNAL API *******************************
+**********************************************************************
+*/
+
 static inky_error_state _spi_send_data(inky_config *cfg,
 				       const UINT8_t *data,
 				       UINT32_t len)

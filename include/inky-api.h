@@ -106,10 +106,10 @@ extern "C" {
  */
 	typedef inky_error_state (*inky_user_spi_write)(const UINT8_t*, UINT32_t);
 
-/* inky_user_spi_write_16
-   :param UINT16_t buf: ptr to buffer to write
-   :param UINT32_t len: length of buffer to write
-*/
+/** @brief inky_user_spi_write_16
+ *  @param UINT16_t buf: ptr to buffer to write
+ *  @param UINT32_t len: length of buffer to write
+ */
 	typedef inky_error_state (*inky_user_spi_write_16)(UINT16_t*, UINT32_t);
 
 /* Inky definitions */
@@ -186,24 +186,25 @@ extern "C" {
 		void *usrptr2; /* Optional usrptr. Pass void if not needed */
 	} inky_config;
 
-/* Setup Function */
+/** @brief Setup Function */
 	inky_error_state inky_setup(inky_config *cfg);
 
-/* Free memory from setup */
+/** @brief Free memory from setup */
 	inky_error_state inky_free(inky_config *cfg);
 
-/* Attach usrptr to framebuffer */
+/** @brief Attach usrptr to framebuffer */
 	inky_error_state inky_fb_usrptr_attach(inky_config *cfg,
 					       UINT8_t pos, void *ptr);
 
-/* Set pixel color in fb */
+/** @brief Set pixel color in fb */
 	inky_error_state inky_fb_set_pixel(inky_config *cfg, UINT8_t x,
 					   UINT8_t y, inky_color c);
 
-/* Update Inky screen to current fb state using config udate mode */
+/** @brief Update Inky screen to current fb state using config update
+ * mode */
 	inky_error_state inky_update(inky_config *cfg);
 
-/* Update Inky screen to current fb by given mode */
+/** @brief Update Inky screen to current fb by given mode */
 	inky_error_state inky_update_by_mode(inky_config *cfg,
 					     inky_fb_type update_type);
 

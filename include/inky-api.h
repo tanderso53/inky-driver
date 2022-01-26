@@ -81,6 +81,7 @@ extern "C" {
 		OUT_OF_MEMORY,
 		OUT_OF_RANGE,
 		NOT_CONFIGURED,
+		NULL_PTR,
 		FAILURE = 1
 	} inky_error_state;
 
@@ -98,7 +99,7 @@ extern "C" {
 	typedef inky_error_state (*inky_user_spi_setup)();
 
 /* Typical kernel callbacks */
-	typedef inky_error_state (*inky_user_delay)(UINT16_t);
+	typedef inky_error_state (*inky_user_delay)(UINT32_t);
 
 /** @brief inky_user_spi_write
  *  @param buf ptr to buffer to write
@@ -181,7 +182,7 @@ extern "C" {
 		inky_user_spi_setup spi_setup_cb; /* SPI setup callback */
 		inky_user_spi_write spi_write_cb; /* SPI 8 bit array write callback */
 		inky_user_spi_write_16 spi_write16_cb; /* SPI 16 bit array write callback */
-		inky_user_delay delay_ms_cb; /* Delay callback with time in ms */
+		inky_user_delay delay_us_cb; /* Delay callback with time in us */
 		void *usrptr1; /* Optional usrptr. Pass void if not needed */
 		void *usrptr2; /* Optional usrptr. Pass void if not needed */
 	} inky_config;

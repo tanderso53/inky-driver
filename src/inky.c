@@ -9,6 +9,13 @@
 **********************************************************************
 */
 
+/** @brief Macro to check and return result of function on failure */
+#define INKY_CHECK_RESULT(retvalue, result) do {	\
+		if (retvalue != result) {		\
+			return retvalue;		\
+		}					\
+	} while (0)
+
 /* Commands recognized by peripheral */
 typedef enum {
 	SOFT_RESET		= 0x12, /* Soft Reset */
@@ -27,6 +34,8 @@ typedef enum {
 	RAM_Y_RANGE		= 0x45, /* Set RAM Y Start/End */
 	RAM_X_PTR_START		= 0x4e, /* Set RAM X Pointer Start */
 	RAM_Y_PTR_START		= 0x4f, /* Set RAM Y Pointer Start */
+	WRITE_PIXEL_BLACK	= 0x24, /* Write pixel black/white */
+	WRITE_PIXEL_COLOR	= 0X26, /* Write pixel yellow or red */
 	UPDATE_SEQUENCE		= 0x22, /* Display Update Sequence */
 	TRIGGER_UPDATE		= 0x20, /* Trigger Display Update */
 	ENTER_DEEP_SLEEP	= 0x10 /* Enter Deep Sleep */
@@ -70,6 +79,9 @@ static inky_error_state _busy_wait(inky_config *cfg);
 static inky_error_state _allocate_fb(inky_config *cfg);
 
 static UINT8_t* _spi_order_bytes(UINT16_t input, UINT8_t* result);
+
+static inky_error_state _inky_prep(inky_config *cfg,
+				   UINT8_t *height_byte_array);
 
 /*
 **********************************************************************
@@ -201,78 +213,94 @@ inky_error_state inky_fb_set_pixel(inky_config *cfg, UINT8_t x,
 inky_error_state inky_update(inky_config *cfg)
 {
 	inky_error_state ret;
-	UINT8_t *height_byte_array = NULL;
+	UINT8_t height_byte_array[2];
 
-	if ((ret = _reset(cfg))) {
+	ret = _inky_prep(cfg, height_byte_array);
+
+	if (ret != OK) {
 		return ret;
 	}
 
-	_spi_order_bytes(cfg->fb->height, height_byte_array);
-
-	/* Use command sequence from Pimoroni's Inky library */
-	_spi_send_command_byte(cfg, ANALOG_BLOCK_CONTROL, 0x54);
-	_spi_send_command_byte(cfg, DIGITAL_BLOCK_CONTROL, 0x3b);
-	_spi_send_command(cfg, GATE_SETTING, height_byte_array, 3);
-	_spi_send_command_byte(cfg, GATE_DRIVING_VOLTAGE, 0x17);
-	_spi_send_command(cfg, SOURCE_DRIVING_VOLTAGE,
-			  (UINT8_t[]) {0x41, 0xac, 0x32}, 3);
-	_spi_send_command_byte(cfg, DUMMY_LINE_PERIOD, 0x07);
-	_spi_send_command_byte(cfg, GATE_LINE_WIDTH, 0x04);
-	_spi_send_command_byte(cfg, DATA_ENTRY_MODE, 0x03);
-	_spi_send_command_byte(cfg, VCOM_REGISTER, 0x3c);
-	_spi_send_command_byte(cfg, GS_TRANSITION_DEFINE, 0x00);
-
-	if (cfg->color->yellow) {
-		_spi_send_command(cfg, SOURCE_DRIVING_VOLTAGE,
-				  (UINT8_t[]) {0x07, 0xac, 0x32},
-				  3);
-	}
-
-	if (cfg->color->red && (cfg->pdt == INKY_WHAT)) {
-		_spi_send_command(cfg, SOURCE_DRIVING_VOLTAGE,
-				  (UINT8_t[]) {0x30, 0xac, 0x22},
-				  3);
-	}
-
-	/* Support for different update modes will be added later */
-	switch (cfg->fb->fb_type) {
-	case REFRESH_ALWAYS:
-		if (cfg->color->yellow) {
-			_spi_send_command(cfg, SET_LUTS,
-					  lut_yellow_refresh,
-					  sizeof(lut_yellow_refresh));
-		} else if (cfg->color->red) {
-			_spi_send_command(cfg, SET_LUTS,
-					  lut_red_refresh,
-					  sizeof(lut_red_refresh));
-		}
-		else {
-			_spi_send_command(cfg, SET_LUTS,
-					  lut_black_refresh,
-					  sizeof(lut_black_refresh));
-		}
-
-		break;
-	default:
-		return NOT_AVAILABLE;
-		break;
-	}
-
 	/* Set ram X and Y  start and end */
-	_spi_send_command(cfg, RAM_X_RANGE,
-			  (UINT8_t[]) {0x00, (cfg->fb->width / 8) - 1},
-			  2);
-	_spi_send_command(cfg, RAM_Y_RANGE, height_byte_array, 4);
+	ret = _spi_send_command(cfg, RAM_X_RANGE,
+				(UINT8_t[]) {0x00, (cfg->fb->width / 8) - 1},
+				2);
+	INKY_CHECK_RESULT(ret, OK);
+
+	ret = _spi_send_command(cfg, RAM_Y_RANGE,
+				(UINT8_t[]) {0x00, 0x00,
+					     height_byte_array[1],
+					     height_byte_array[0]}, 4);
+	INKY_CHECK_RESULT(ret, OK);
 
 	/* Write the framebuffer to the display */
-	_spi_send_command_byte(cfg, RAM_X_PTR_START, 0x00);
-	_spi_send_command(cfg, RAM_Y_PTR_START,
-			  (UINT8_t[]) {0x00, 0x00}, 2);
+	for (UINT16_t i = 0; i < cfg->fb->height; i++) {
+		UINT32_t arr_addr = i * cfg->fb->width;
+		UINT8_t row[cfg->fb->width];
+		UINT8_t row_color[cfg->fb->width];
+		UINT8_t sweep_color = 0;
+		UINT8_t row_addr[2];
+
+		/* Write black and color rows to separate arrays */
+		for (UINT16_t j = 0; j < cfg->fb->width; j++) {
+			row[j] = cfg->fb->buffer[arr_addr] == 1 ? 1 : 0;
+			row_color[j] = cfg->fb->buffer[arr_addr] > 1 ? 1 : 0;
+
+			if (row_color[j] > 0)
+				sweep_color = 1;
+
+			arr_addr++;
+		}
+
+		if (!_spi_order_bytes(i, row_addr))
+			return NULL_PTR;
+
+		ret = _spi_send_command_byte(cfg, RAM_X_PTR_START, 0x00);
+		INKY_CHECK_RESULT(ret, OK);
+
+		ret = _spi_send_command(cfg, RAM_Y_PTR_START, row_addr, 2);
+		INKY_CHECK_RESULT(ret, OK);
+
+		/* Write black/white row */
+		ret = _spi_send_command(cfg, WRITE_PIXEL_BLACK, row,
+					cfg->fb->width);
+		INKY_CHECK_RESULT(ret, OK);
+
+		/* Write color row if it exists */
+		if (sweep_color) {
+			_spi_send_command_byte(cfg, RAM_X_PTR_START, 0x00);
+			_spi_send_command(cfg, RAM_Y_PTR_START, row_addr, 2);
+
+			_spi_send_command(cfg, WRITE_PIXEL_COLOR, row,
+					  cfg->fb->width);
+		}
+	}
+
+	/* Trigger the refresh and write operation on display */
+	ret = _spi_send_command_byte(cfg, UPDATE_SEQUENCE, 0xC7);
+	INKY_CHECK_RESULT(ret, OK);
+
+	ret = _spi_send_command(cfg, TRIGGER_UPDATE, NULL, 0);
+	INKY_CHECK_RESULT(ret, OK);
+
+	ret = cfg->delay_us_cb(50);
+	INKY_CHECK_RESULT(ret, OK);
+
+	ret = _busy_wait(cfg);
+	INKY_CHECK_RESULT(ret, OK);
+
+	/* Put display to sleep */
+	ret = _spi_send_command_byte(cfg, ENTER_DEEP_SLEEP, 0x01);
+	INKY_CHECK_RESULT(ret, OK);
+
+	return OK;
 }
 
 inky_error_state inky_update_by_mode(inky_config *cfg,
 				     inky_fb_type update_type)
 {
+	/* TODO: Implement function to update, overriding configure
+	 * mode */
 }
 
 /*
@@ -338,14 +366,14 @@ static inky_error_state _reset(inky_config *cfg)
 		return ret;
 	}
 
-	cfg->delay_ms_cb(100);
+	cfg->delay_us_cb(100000);
 	cfg->gpio_output_cb(RESET_PIN, HIGH);
 
 	if (ret != OK) {
 		return ret;
 	}
 
-	cfg->delay_ms_cb(100);
+	cfg->delay_us_cb(100000);
 
 	/* Send soft reset */
 	if ((ret =_spi_send_command(cfg, SOFT_RESET, NULL, 0)) != OK) {
@@ -417,15 +445,83 @@ static UINT8_t* _spi_order_bytes(UINT16_t input, UINT8_t* result) {
 	UINT8_t height_byte_little;
 	UINT8_t height_byte_big;
 
+	if (!result) {
+		return NULL;
+	}
+
 	/* Fit 16bit heights into 8bit message stream */
 	height_byte_little = (UINT8_t) (input & 0x00FF);
 	height_byte_big = (UINT8_t) ((input >> 2) & 0x00FF);
-
-	/* Must free later */
-	result = malloc(2);
 
 	result[0] = height_byte_big;
 	result[1] = height_byte_little;
 
 	return result;
+}
+
+static inky_error_state _inky_prep(inky_config *cfg, 
+				   UINT8_t *height_byte_array)
+{
+	inky_error_state ret;
+
+	if ((ret = _reset(cfg))) {
+		return ret;
+	}
+
+	if (!_spi_order_bytes(cfg->fb->height, height_byte_array))
+		return NULL_PTR;
+
+	/* Use command sequence from Pimoroni's Inky library */
+	_spi_send_command_byte(cfg, ANALOG_BLOCK_CONTROL, 0x54);
+	_spi_send_command_byte(cfg, DIGITAL_BLOCK_CONTROL, 0x3b);
+	_spi_send_command(cfg, GATE_SETTING, height_byte_array, 3);
+	_spi_send_command_byte(cfg, GATE_DRIVING_VOLTAGE, 0x17);
+	_spi_send_command(cfg, SOURCE_DRIVING_VOLTAGE,
+			  (UINT8_t[]) {0x41, 0xac, 0x32}, 3);
+	_spi_send_command_byte(cfg, DUMMY_LINE_PERIOD, 0x07);
+	_spi_send_command_byte(cfg, GATE_LINE_WIDTH, 0x04);
+	_spi_send_command_byte(cfg, DATA_ENTRY_MODE, 0x03);
+	_spi_send_command_byte(cfg, VCOM_REGISTER, 0x3c);
+
+	/* Set border config to white */
+	_spi_send_command_byte(cfg, GS_TRANSITION_DEFINE, 0x00);
+	_spi_send_command_byte(cfg, GS_TRANSITION_DEFINE, 0x31);
+
+	if (cfg->color->yellow) {
+		_spi_send_command(cfg, SOURCE_DRIVING_VOLTAGE,
+				  (UINT8_t[]) {0x07, 0xac, 0x32},
+				  3);
+	}
+
+	if (cfg->color->red && (cfg->pdt == INKY_WHAT)) {
+		_spi_send_command(cfg, SOURCE_DRIVING_VOLTAGE,
+				  (UINT8_t[]) {0x30, 0xac, 0x22},
+				  3);
+	}
+
+	/* Support for different update modes will be added later */
+	switch (cfg->fb->fb_type) {
+	case REFRESH_ALWAYS:
+		if (cfg->color->yellow) {
+			_spi_send_command(cfg, SET_LUTS,
+					  lut_yellow_refresh,
+					  sizeof(lut_yellow_refresh));
+		} else if (cfg->color->red) {
+			_spi_send_command(cfg, SET_LUTS,
+					  lut_red_refresh,
+					  sizeof(lut_red_refresh));
+		}
+		else {
+			_spi_send_command(cfg, SET_LUTS,
+					  lut_black_refresh,
+					  sizeof(lut_black_refresh));
+		}
+
+		break;
+	default:
+		return NOT_AVAILABLE;
+		break;
+	}
+
+	return OK;
 }

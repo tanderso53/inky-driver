@@ -138,7 +138,7 @@ extern "C" {
 
 /* Framebuffer Definitions */
 
-/* Framebuffer type dictates how the buffer is displayed and
+/** @brief Framebuffer type dictates how the buffer is displayed and
  * refreshed */
 	typedef enum {
 		REFRESH_ALWAYS, /* full refresh anytime the fb is written */
@@ -146,13 +146,14 @@ extern "C" {
 		OVERLAY, /* Manual refresh only (for terminals) */
 	} inky_fb_type;
 
-/* Framebuffer is defined by the following struct, but will be setup
-   by the API commands in this section unless the user decides they
-   are unworthy of use */
+/** @brief Framebuffer is defined by the following struct, but will be
+ *  setup by the API commands in this section unless the user decides
+ *  they are unworthy of use */
 	typedef struct inky_fbnode {
 		UINT16_t width;
 		UINT16_t height;
 		UINT8_t *buffer;
+		UINT16_t bytes;
 		inky_fb_type fb_type;
 		void *usrptr1;
 		void *usrptr2;
@@ -208,6 +209,9 @@ extern "C" {
 /** @brief Update Inky screen to current fb by given mode */
 	inky_error_state inky_update_by_mode(inky_config *cfg,
 					     inky_fb_type update_type);
+
+/** @brief Clear Inky screen */
+	inky_error_state inky_clear(inky_config *cfg);
 
 #ifdef __cplusplus
 }

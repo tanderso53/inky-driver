@@ -168,6 +168,12 @@ inky_error_state inky_fb_usrptr_attach(inky_config *cfg, UINT8_t pos,
 inky_error_state inky_fb_set_pixel(inky_config *cfg, UINT8_t x,
 				   UINT8_t y, inky_color c)
 {
+	UINT16_t byte_addr;
+	UINT8_t bit_addr;
+	UINT8_t mask;
+	UINT8_t *byte_rst;
+
+	/* Check for ranging issues */
 	if (!cfg->fb) {
 		return NOT_CONFIGURED;
 	}
@@ -180,32 +186,91 @@ inky_error_state inky_fb_set_pixel(inky_config *cfg, UINT8_t x,
 		return OUT_OF_RANGE;
 	}
 
+	/*
+	 * Address the desired pixel.
+	 *
+	 * Pixel flow is as follows:
+	 *
+	 * 0                   399
+	 * *--------------------->
+	 *                    .
+	 *                 .
+	 *              .
+	 *           .
+	 *        .
+	 *   | .
+	 *   |___
+	 * *--------------------->
+	 * 400                 799
+	 */
+	byte_addr = ((x + cfg->fb->width * y) * 2) / 8;
+	bit_addr = (((x + cfg->fb->width * y) * 2) % 8);
+
+	byte_rst = &cfg->fb->buffer[byte_addr];
+
+	/*
+	 * Find the two-byte pixel data and flip the appropriate bit(s)
+	 */
 	switch (c) {
+
 	case BLACK:
+
 		if (cfg->color->black == 0) {
 			return NOT_AVAILABLE;
 		}
+
+		mask = 0x01 << bit_addr;
+		*byte_rst = *byte_rst | mask;
+
+		mask = 0x02 << bit_addr;
+		*byte_rst = *byte_rst ^ mask;
+
 		break;
+
 	case WHITE:
+
 		if (cfg->color->white == 0) {
 			return NOT_AVAILABLE;
 		}
+
+		mask = 0x03 << bit_addr;
+		*byte_rst = *byte_rst ^ mask;
+
 		break;
+
 	case RED:
+
 		if (cfg->color->red == 0) {
 			return NOT_AVAILABLE;
 		}
+
+		mask = 0x02 << bit_addr;
+		*byte_rst = *byte_rst | mask;
+
+		mask = 0x01 << bit_addr;
+		*byte_rst = *byte_rst ^ mask;
+
 		break;
+
 	case YELLOW:
+
 		if (cfg->color->yellow == 0) {
 			return NOT_AVAILABLE;
 		}
-		break;
-	default:
-		return NOT_AVAILABLE;
-	}
 
-	cfg->fb->buffer[cfg->fb->width * y + x] = (UINT8_t) c;
+		mask = 0x02 << bit_addr;
+		*byte_rst = *byte_rst | mask;
+
+		mask = 0x01 << bit_addr;
+		*byte_rst = *byte_rst ^ mask;
+
+		break;
+
+	default:
+
+		return NOT_AVAILABLE;
+
+	}
 
 	return OK;
 }
@@ -235,21 +300,46 @@ inky_error_state inky_update(inky_config *cfg)
 
 	/* Write the framebuffer to the display */
 	for (UINT16_t i = 0; i < cfg->fb->height; i++) {
-		UINT32_t arr_addr = i * cfg->fb->width;
-		UINT8_t row[cfg->fb->width];
-		UINT8_t row_color[cfg->fb->width];
+		UINT32_t arr_addr = i * (cfg->fb->width/8);
+		UINT8_t row[cfg->fb->width/8];
+		UINT8_t row_color[cfg->fb->width/8];
 		UINT8_t sweep_color = 0;
 		UINT8_t row_addr[2];
 
 		/* Write black and color rows to separate arrays */
-		for (UINT16_t j = 0; j < cfg->fb->width; j++) {
-			row[j] = cfg->fb->buffer[arr_addr] == 1 ? 1 : 0;
-			row_color[j] = cfg->fb->buffer[arr_addr] > 1 ? 1 : 0;
+		for (UINT16_t j = 0; j < cfg->fb->width / 8; j++) {
+			UINT16_t data;
+
+			data = cfg->fb->buffer[arr_addr + j * 2];
+			data = data |
+				((UINT16_t) cfg->fb->buffer[arr_addr + j * 2 + 1]
+				 << 8);
+
+			row[j] = 0;
+			row_color[j] = 0;
+
+			for (UINT8_t k = 0; k < 8; k++) {
+				uint8_t mask;
+
+				/* Black and white */
+				mask = data & 0x0001;
+				data = data >> 1;
+
+				mask = mask << k;
+
+				row[j] = row[j] | mask;
+
+				/* Color */
+				mask = data & 0x0001;
+				data = data >> 1;
+
+				mask = mask << k;
+
+				row_color[j] = row_color[j] | mask;
+			}
 
 			if (row_color[j] > 0)
 				sweep_color = 1;
-
-			arr_addr++;
 		}
 
 		if (!_spi_order_bytes(i, row_addr))
@@ -263,7 +353,7 @@ inky_error_state inky_update(inky_config *cfg)
 
 		/* Write black/white row */
 		ret = _spi_send_command(cfg, WRITE_PIXEL_BLACK, row,
-					cfg->fb->width);
+					cfg->fb->width/8);
 		INKY_CHECK_RESULT(ret, OK);
 
 		/* Write color row if it exists */
@@ -272,7 +362,7 @@ inky_error_state inky_update(inky_config *cfg)
 			_spi_send_command(cfg, RAM_Y_PTR_START, row_addr, 2);
 
 			_spi_send_command(cfg, WRITE_PIXEL_COLOR, row,
-					  cfg->fb->width);
+					  cfg->fb->width/8);
 		}
 	}
 
@@ -301,6 +391,29 @@ inky_error_state inky_update_by_mode(inky_config *cfg,
 {
 	/* TODO: Implement function to update, overriding configure
 	 * mode */
+}
+
+inky_error_state inky_clear(inky_config *cfg)
+{
+	inky_error_state ret;
+
+	/* Write zeros to all pixels */
+	for (UINT16_t h = 0; h < cfg->fb->height; h++) {
+
+		for (UINT16_t w = 0; w < cfg->fb->width; w++) {
+
+			ret = inky_fb_set_pixel(cfg, w, h, WHITE);
+			INKY_CHECK_RESULT(ret, OK);
+
+		}
+
+	}
+
+	/* Write zeroed framebuffer to display */
+	ret = inky_update(cfg);
+	INKY_CHECK_RESULT(ret, OK);
+
+	return OK;
 }
 
 /*
@@ -401,6 +514,11 @@ static inky_error_state _allocate_fb(inky_config *cfg)
 		return OK;
 	}
 
+	/*
+	 * Check the inky product name
+	 *
+	 * TODO: Does this really belong in frame buffer allocation?
+	 */
 	switch (cfg->pdt) {
 	case INKY_WHAT:
 		dr = &_inky_what;
@@ -413,21 +531,64 @@ static inky_error_state _allocate_fb(inky_config *cfg)
 		break;
 	}
 
-	cfg->fb = malloc(sizeof(inky_fb));
+	cfg->fb = malloc(sizeof(inky_fb)); /* Must free with inky_free() */
 
 	if (!cfg->fb) {
 		return OUT_OF_MEMORY;
 	}
 
-	cfg->fb->buffer = malloc(dr->height * dr->width * sizeof(UINT8_t));
+	/*
+	 * Frame buffer size will be dependent on the resolution
+	 *
+	 * As a pixel is typical white, black, or one of red/yellow,
+	 * we need two bits to address each pixel
+	 *
+	 * Pixel addressing is as follows:
+	 *
+	 *	White:	0
+	 *	Black:	1
+	 *	Color:	2
+	 *
+	 * The framebuffer will be allocated with the minimum number
+	 * of bytes required to contain height * width * 2 bits. This
+	 * size will then be stored in fb->bytes
+	 *
+	 * Pixels are encoded as such:
+	 *
+	 *        Byte 0   Byte 1
+	 *       xxxxxxxx xxxxxxxx
+	 *      |        |
+	 *  ___/          \________________________
+	 * |Col3|B/W3|Col2|B/W2|Col1|B/W1|Col0|B/W0|
+	 *  ---------------------------------------
+	 *
+	 * Then Byte 1 would start with B/W4 as the rightmost bit
+	 */
+
+	cfg->fb->width = dr->width;
+	cfg->fb->height = dr->height;
+
+	cfg->fb->bytes = cfg->fb->height * cfg->fb->width * 2 / 8;
+
+	cfg->fb->buffer = malloc(cfg->fb->bytes); /* Must free with inky_free() */
 
 	if (!cfg->fb->buffer) {
 		return OUT_OF_MEMORY;
 	}
 
-	cfg->fb->width = dr->width;
-	cfg->fb->height = dr->height;
+	/* Initialize framebuffer with zeros */
+	for (UINT16_t i = 0; i < cfg->fb->bytes; i++) {
+		cfg->fb->buffer[i] = 0;
+	}
 
+	/*
+	 * Check config for fb related flags to set fb type
+	 *
+	 * REFRESH_ALWAYS:	Blank entire screen before updating
+	 * REFRESH_DIFF:	Blank and write only changed pixels
+	 * OVERLAY:		Do not blank screen before writing
+	 *
+	 */
 	if ((cfg->exclude_flags & INKY_FLAG_REFRESH_ALWAYS & INKY_FLAG_NO_DIFF) != 0) {
 		cfg->fb->fb_type = REFRESH_DIFF;
 	} else if ((cfg->exclude_flags & INKY_FLAG_REFRESH_ALWAYS) != 0) {

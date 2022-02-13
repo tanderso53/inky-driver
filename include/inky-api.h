@@ -40,6 +40,28 @@
 #define INKY_FLAG_REFRESH_ALWAYS	0x0004
 #define INKY_FLAG_NO_DIFF		0x0008
 
+#define INKY_SPI_SPEED_HZ_MAX		800000
+#define INKY_SPI_BITS_DEFAULT		8
+
+/** @defgroup Inky error states
+ * @{
+ */
+
+#define INKY_OK				 0
+#define INKY_E_NOT_AVAILABLE		-1
+#define INKY_E_TIMEOUT			-2
+#define INKY_E_BAD_PERMISSIONS		-3
+#define INKY_E_OUT_OF_MEMORY		-4
+#define INKY_E_OUT_OF_RANGE		-5
+#define INKY_E_NOT_CONFIGURED		-6
+#define INKY_E_NULL_PTR			-7
+#define INKY_E_FAILURE			-8
+#define INKY_E_COMM_FAILURE		-9
+
+/**
+ * @}
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* #ifdef __cplusplus */
@@ -47,71 +69,72 @@ extern "C" {
 /* GPIO pins */
 	typedef enum {
 		/* GPIO Pins */
-		RESET_PIN,
-		BUSY_PIN,
-		DC_PIN,
+		INKY_PIN_RESET,
+		INKY_PIN_BUSY,
+		INKY_PIN_DC,
 		/* In addition the following pins are used for SPI */
-		CS_PIN,
-		MOSI_PIN,
-		SCLK_PIN
+		INKY_PIN_CS,
+		INKY_PIN_MOSI,
+		INKY_PIN_SCLK
 	} inky_pin;
 
 	typedef enum {
-		IN,
-		OUT
+		INKY_DIR_IN,
+		INKY_DIR_OUT
 	} inky_gpio_direction;
 
 	typedef enum {
-		OFF = 0,
-		PULLUP,
-		PULLDOWN
+		INKY_PINCFG_OFF = 0,
+		INKY_PINCFG_PULLUP,
+		INKY_PINCFG_PULLDOWN
 	} inky_gpio_pull_up_down;
 
 	typedef enum {
-		LOW = 0,
-		HIGH = 1,
-		INPUT
+		INKY_PINSTATE_LOW = 0,
+		INKY_PINSTATE_HIGH = 1,
+		INKY_PINSTATE_INPUT
 	} inky_pin_state;
 
-	typedef enum {
-		OK = 0,
-		NOT_AVAILABLE,
-		TIMEOUT,
-		BAD_PERMISSIONS,
-		OUT_OF_MEMORY,
-		OUT_OF_RANGE,
-		NOT_CONFIGURED,
-		NULL_PTR,
-		FAILURE = 1
-	} inky_error_state;
+	typedef int8_t inky_error_state;
 
 /* GPIO function pointer types to be set by user */
-	typedef inky_error_state (*inky_user_gpio_initialize)();
+	typedef inky_error_state (*inky_user_gpio_initialize)(void*);
 	typedef inky_error_state (*inky_user_gpio_setup_pin)(inky_pin,
 							     inky_gpio_direction,
 							     inky_pin_state,
-							     inky_gpio_pull_up_down);
-	typedef inky_error_state (*inky_user_gpio_output_state)(inky_pin, inky_pin_state);
-	typedef inky_error_state (*inky_user_gpio_input_state)(inky_pin, inky_pin_state*);
-	typedef inky_error_state (*inky_user_gpio_poll_pin)(inky_pin, UINT16_t);
+							     inky_gpio_pull_up_down,
+							     void*);
+	typedef inky_error_state (*inky_user_gpio_output_state)(inky_pin,
+								inky_pin_state,
+								void*);
+	typedef inky_error_state (*inky_user_gpio_input_state)(inky_pin,
+							       inky_pin_state*,
+							       void*);
+	typedef inky_error_state (*inky_user_gpio_poll_pin)(inky_pin,
+							    UINT16_t,
+							    void*);
 
 /* SPI function pointer types to be set by user */
-	typedef inky_error_state (*inky_user_spi_setup)();
+	typedef inky_error_state (*inky_user_spi_setup)(void*);
 
 /* Typical kernel callbacks */
-	typedef inky_error_state (*inky_user_delay)(UINT32_t);
+	typedef inky_error_state (*inky_user_delay)(UINT32_t, void*);
 
 /** @brief inky_user_spi_write
  *  @param buf ptr to buffer to write
  *  @param len length of buffer to write
  */
-	typedef inky_error_state (*inky_user_spi_write)(const UINT8_t*, UINT32_t);
+	typedef inky_error_state (*inky_user_spi_write)(const UINT8_t*,
+							UINT32_t,
+							void*);
 
 /** @brief inky_user_spi_write_16
  *  @param UINT16_t buf: ptr to buffer to write
  *  @param UINT32_t len: length of buffer to write
  */
-	typedef inky_error_state (*inky_user_spi_write_16)(UINT16_t*, UINT32_t);
+	typedef inky_error_state (*inky_user_spi_write_16)(UINT16_t*,
+							   UINT32_t,
+							   void*);
 
 /* Inky definitions */
 	typedef enum {
@@ -122,10 +145,10 @@ extern "C" {
 
 /* Colors various inkies can handle */
 	typedef enum {
-		WHITE = 0,
-		BLACK = 1,
-		RED = 2,
-		YELLOW = 3
+		INKY_COLOR_WHITE = 0,
+		INKY_COLOR_BLACK = 1,
+		INKY_COLOR_RED = 2,
+		INKY_COLOR_YELLOW = 3
 	} inky_color;
 
 /* Define the available colors in this struct, 1 on, 0 off */
@@ -139,11 +162,15 @@ extern "C" {
 /* Framebuffer Definitions */
 
 /** @brief Framebuffer type dictates how the buffer is displayed and
- * refreshed */
+ * refreshed
+ * @var INKY_FB_REFRESH_ALWAYS full refresh anytime the fb is written
+ * @var INKY_FB_REFRESH_DIFF only refresh regions that change
+ * @var INKY_FB_OVERLAY Manual refresh only (for terminals)
+ */
 	typedef enum {
-		REFRESH_ALWAYS, /* full refresh anytime the fb is written */
-		REFRESH_DIFF, /* only refresh regions that change */
-		OVERLAY, /* Manual refresh only (for terminals) */
+		INKY_FB_REFRESH_ALWAYS, 
+		INKY_FB_REFRESH_DIFF,
+		INKY_FB_OVERLAY,
 	} inky_fb_type;
 
 /** @brief Framebuffer is defined by the following struct, but will be
@@ -162,12 +189,12 @@ extern "C" {
 	typedef UINT16_t inky_flags;
 
 /** @brief Configuration structure for Inky, to pass to setup function
-    @p pdt INKY_WHAT, INKY_PHATT, etc
-    @p *color Available Colors
-    @p *fb Frame buffer to be allocated by library (note: must free later)
-    @p *active_fb Not set by user. Always null when REFRESH_ALWAYS
-    @p exclude_flags Config flags to remove
-    @p gpio_init_cb gpio init callback
+    @var pdt INKY_WHAT, INKY_PHATT, etc
+    @var *color Available Colors
+    @var *fb Frame buffer to be allocated by library (note: must free later)
+    @var *active_fb Not set by user. Always null when REFRESH_ALWAYS
+    @var exclude_flags Config flags to remove
+    @var gpio_init_cb gpio init callback
 **/
 	typedef struct inky_confignode {
 		inky_product pdt;

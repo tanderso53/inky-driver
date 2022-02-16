@@ -18,27 +18,27 @@
 
 /* Commands recognized by peripheral */
 typedef enum {
-	SOFT_RESET		= 0x12, /* Soft Reset */
-	ANALOG_BLOCK_CONTROL	= 0x74, /* Set Analog Block Control */
-	DIGITAL_BLOCK_CONTROL	= 0x7e, /* Set Digital Block Control */
-	GATE_SETTING		= 0x01, /* Gate setting */
-	GATE_DRIVING_VOLTAGE	= 0x03, /* Gate Driving Voltage */
-	SOURCE_DRIVING_VOLTAGE	= 0x04, /* Source Driving Voltage */
-	DUMMY_LINE_PERIOD	= 0x3a, /* Dummy line period */
-	GATE_LINE_WIDTH		= 0x3b, /* Gate line width */
-	DATA_ENTRY_MODE		= 0x11, /* Data entry mode setting 0x03 = X/Y increment */
-	VCOM_REGISTER		= 0x2c, /* VCOM Register, 0x3c = -1.5v? */
-	GS_TRANSITION_DEFINE	= 0x3c, /* GS Transition Define A + VSS + LUT0 */
-	SET_LUTS		= 0x32, /* Set LUTs */
-	RAM_X_RANGE		= 0x44, /* Set RAM X Start/End */
-	RAM_Y_RANGE		= 0x45, /* Set RAM Y Start/End */
-	RAM_X_PTR_START		= 0x4e, /* Set RAM X Pointer Start */
-	RAM_Y_PTR_START		= 0x4f, /* Set RAM Y Pointer Start */
-	WRITE_PIXEL_BLACK	= 0x24, /* Write pixel black/white */
-	WRITE_PIXEL_COLOR	= 0X26, /* Write pixel yellow or red */
-	UPDATE_SEQUENCE		= 0x22, /* Display Update Sequence */
-	TRIGGER_UPDATE		= 0x20, /* Trigger Display Update */
-	ENTER_DEEP_SLEEP	= 0x10 /* Enter Deep Sleep */
+	SOFT_RESET		= 0x12, /**< Soft Reset */
+	ANALOG_BLOCK_CONTROL	= 0x74, /**< Set Analog Block Control */
+	DIGITAL_BLOCK_CONTROL	= 0x7e, /**< Set Digital Block Control */
+	GATE_SETTING		= 0x01, /**< Gate setting */
+	GATE_DRIVING_VOLTAGE	= 0x03, /**< Gate Driving Voltage */
+	SOURCE_DRIVING_VOLTAGE	= 0x04, /**< Source Driving Voltage */
+	DUMMY_LINE_PERIOD	= 0x3a, /**< Dummy line period */
+	GATE_LINE_WIDTH		= 0x3b, /**< Gate line width */
+	DATA_ENTRY_MODE		= 0x11, /**< Data entry mode setting 0x03 = X/Y increment */
+	VCOM_REGISTER		= 0x2c, /**< VCOM Register, 0x3c = -1.5v? */
+	GS_TRANSITION_DEFINE	= 0x3c, /**< GS Transition Define A + VSS + LUT0 */
+	SET_LUTS		= 0x32, /**< Set LUTs */
+	RAM_X_RANGE		= 0x44, /**< Set RAM X Start/End */
+	RAM_Y_RANGE		= 0x45, /**< Set RAM Y Start/End */
+	RAM_X_PTR_START		= 0x4e, /**< Set RAM X Pointer Start */
+	RAM_Y_PTR_START		= 0x4f, /**< Set RAM Y Pointer Start */
+	WRITE_PIXEL_BLACK	= 0x24, /**< Write pixel black/white */
+	WRITE_PIXEL_COLOR	= 0X26, /**< Write pixel yellow or red */
+	UPDATE_SEQUENCE		= 0x22, /**< Display Update Sequence */
+	TRIGGER_UPDATE		= 0x20, /**< Trigger Display Update */
+	ENTER_DEEP_SLEEP	= 0x10 /**< Enter Deep Sleep */
 } dcommand;
 
 static struct _display_res {
@@ -93,28 +93,37 @@ inky_error_state inky_setup(inky_config *cfg)
 {
 	inky_error_state ret;
 
-	if ((ret = cfg->gpio_init_cb()) != OK) {
+	if ((ret = cfg->gpio_init_cb(cfg->intf_ptr)) != INKY_OK) {
 		return ret;
 	}
 
-	if ((ret = cfg->gpio_setup_pin_cb(DC_PIN, OUT, LOW, OFF)) != OK) {
+	if ((ret = cfg->gpio_setup_pin_cb(INKY_PIN_DC, INKY_DIR_OUT,
+					  INKY_PINSTATE_LOW,
+					  INKY_PINCFG_OFF,
+					  cfg->intf_ptr)) != INKY_OK) {
 		return ret;
 	}
 
-	if ((ret = cfg->gpio_setup_pin_cb(RESET_PIN, OUT, HIGH, OFF)) != OK) {
+	if ((ret = cfg->gpio_setup_pin_cb(INKY_PIN_RESET, INKY_DIR_OUT,
+					  INKY_PINSTATE_HIGH,
+					  INKY_PINCFG_OFF,
+					  cfg->intf_ptr)) != INKY_OK) {
 		return ret;
 	}
 
-	if ((ret = cfg->gpio_setup_pin_cb(BUSY_PIN, IN, INPUT, OFF)) != OK) {
+	if ((ret = cfg->gpio_setup_pin_cb(INKY_PIN_BUSY, INKY_DIR_IN,
+					  INKY_PINSTATE_INPUT,
+					  INKY_PINCFG_OFF,
+					  cfg->intf_ptr)) != INKY_OK) {
 		return ret;
 	}
 
-	if ((ret = cfg->spi_setup_cb()) != OK) {
+	if ((ret = cfg->spi_setup_cb(cfg->intf_ptr)) != INKY_OK) {
 		return ret;
 	}
 
 	if ((cfg->exclude_flags & INKY_FLAG_ALLOCATE_FB) == 0) {
-		if ((ret = _allocate_fb(cfg)) != OK) {
+		if ((ret = _allocate_fb(cfg)) != INKY_OK) {
 			return ret;
 		}
 	}
@@ -125,7 +134,7 @@ inky_error_state inky_setup(inky_config *cfg)
 		return ret;
 	}
 
-	return OK;
+	return INKY_OK;
 }
 
 inky_error_state inky_free(inky_config *cfg)
@@ -140,14 +149,14 @@ inky_error_state inky_free(inky_config *cfg)
 		free(cfg->active_fb);
 	}
 
-	return OK;
+	return INKY_OK;
 }
 
 inky_error_state inky_fb_usrptr_attach(inky_config *cfg, UINT8_t pos,
 				       void *ptr)
 {
 	if (!cfg->fb) {
-		return NOT_CONFIGURED;
+		return INKY_E_NOT_CONFIGURED;
 	}
 
 	switch (pos) {
@@ -158,11 +167,11 @@ inky_error_state inky_fb_usrptr_attach(inky_config *cfg, UINT8_t pos,
 		cfg->fb->usrptr2 = ptr;
 		break;
 	default:
-		return NOT_AVAILABLE;
+		return INKY_E_NOT_AVAILABLE;
 		break;
 	}
 
-	return OK;
+	return INKY_OK;
 }
 
 inky_error_state inky_fb_set_pixel(inky_config *cfg, UINT8_t x,
@@ -175,15 +184,15 @@ inky_error_state inky_fb_set_pixel(inky_config *cfg, UINT8_t x,
 
 	/* Check for ranging issues */
 	if (!cfg->fb) {
-		return NOT_CONFIGURED;
+		return INKY_E_NOT_CONFIGURED;
 	}
 
 	if (x >= cfg->fb->width) {
-		return OUT_OF_RANGE;
+		return INKY_E_OUT_OF_RANGE;
 	}
 
 	if (y >= cfg->fb->height) {
-		return OUT_OF_RANGE;
+		return INKY_E_OUT_OF_RANGE;
 	}
 
 	/*
@@ -213,10 +222,10 @@ inky_error_state inky_fb_set_pixel(inky_config *cfg, UINT8_t x,
 	 */
 	switch (c) {
 
-	case BLACK:
+	case INKY_COLOR_BLACK:
 
 		if (cfg->color->black == 0) {
-			return NOT_AVAILABLE;
+			return INKY_E_NOT_AVAILABLE;
 		}
 
 		mask = 0x01 << bit_addr;
@@ -227,10 +236,10 @@ inky_error_state inky_fb_set_pixel(inky_config *cfg, UINT8_t x,
 
 		break;
 
-	case WHITE:
+	case INKY_COLOR_WHITE:
 
 		if (cfg->color->white == 0) {
-			return NOT_AVAILABLE;
+			return INKY_E_NOT_AVAILABLE;
 		}
 
 		mask = 0x03 << bit_addr;
@@ -238,10 +247,10 @@ inky_error_state inky_fb_set_pixel(inky_config *cfg, UINT8_t x,
 
 		break;
 
-	case RED:
+	case INKY_COLOR_RED:
 
 		if (cfg->color->red == 0) {
-			return NOT_AVAILABLE;
+			return INKY_E_NOT_AVAILABLE;
 		}
 
 		mask = 0x02 << bit_addr;
@@ -252,10 +261,10 @@ inky_error_state inky_fb_set_pixel(inky_config *cfg, UINT8_t x,
 
 		break;
 
-	case YELLOW:
+	case INKY_COLOR_YELLOW:
 
 		if (cfg->color->yellow == 0) {
-			return NOT_AVAILABLE;
+			return INKY_E_NOT_AVAILABLE;
 		}
 
 		mask = 0x02 << bit_addr;
@@ -268,11 +277,11 @@ inky_error_state inky_fb_set_pixel(inky_config *cfg, UINT8_t x,
 
 	default:
 
-		return NOT_AVAILABLE;
+		return INKY_E_NOT_AVAILABLE;
 
 	}
 
-	return OK;
+	return INKY_OK;
 }
 
 inky_error_state inky_update(inky_config *cfg)
@@ -282,7 +291,7 @@ inky_error_state inky_update(inky_config *cfg)
 
 	ret = _inky_prep(cfg, height_byte_array);
 
-	if (ret != OK) {
+	if (ret != INKY_OK) {
 		return ret;
 	}
 
@@ -290,13 +299,13 @@ inky_error_state inky_update(inky_config *cfg)
 	ret = _spi_send_command(cfg, RAM_X_RANGE,
 				(UINT8_t[]) {0x00, (cfg->fb->width / 8) - 1},
 				2);
-	INKY_CHECK_RESULT(ret, OK);
+	INKY_CHECK_RESULT(ret, INKY_OK);
 
 	ret = _spi_send_command(cfg, RAM_Y_RANGE,
 				(UINT8_t[]) {0x00, 0x00,
 					     height_byte_array[1],
 					     height_byte_array[0]}, 4);
-	INKY_CHECK_RESULT(ret, OK);
+	INKY_CHECK_RESULT(ret, INKY_OK);
 
 	/* Write the framebuffer to the display */
 	for (UINT16_t i = 0; i < cfg->fb->height; i++) {
@@ -343,18 +352,18 @@ inky_error_state inky_update(inky_config *cfg)
 		}
 
 		if (!_spi_order_bytes(i, row_addr))
-			return NULL_PTR;
+			return INKY_E_NULL_PTR;
 
 		ret = _spi_send_command_byte(cfg, RAM_X_PTR_START, 0x00);
-		INKY_CHECK_RESULT(ret, OK);
+		INKY_CHECK_RESULT(ret, INKY_OK);
 
 		ret = _spi_send_command(cfg, RAM_Y_PTR_START, row_addr, 2);
-		INKY_CHECK_RESULT(ret, OK);
+		INKY_CHECK_RESULT(ret, INKY_OK);
 
 		/* Write black/white row */
 		ret = _spi_send_command(cfg, WRITE_PIXEL_BLACK, row,
 					cfg->fb->width/8);
-		INKY_CHECK_RESULT(ret, OK);
+		INKY_CHECK_RESULT(ret, INKY_OK);
 
 		/* Write color row if it exists */
 		if (sweep_color) {
@@ -368,28 +377,28 @@ inky_error_state inky_update(inky_config *cfg)
 
 	/* Trigger the refresh and write operation on display */
 	ret = _spi_send_command_byte(cfg, UPDATE_SEQUENCE, 0xC7);
-	INKY_CHECK_RESULT(ret, OK);
+	INKY_CHECK_RESULT(ret, INKY_OK);
 
 	ret = _spi_send_command(cfg, TRIGGER_UPDATE, NULL, 0);
-	INKY_CHECK_RESULT(ret, OK);
+	INKY_CHECK_RESULT(ret, INKY_OK);
 
-	ret = cfg->delay_us_cb(50);
-	INKY_CHECK_RESULT(ret, OK);
+	ret = cfg->delay_us_cb(50, cfg->intf_ptr);
+	INKY_CHECK_RESULT(ret, INKY_OK);
 
 	ret = _busy_wait(cfg);
-	INKY_CHECK_RESULT(ret, OK);
+	INKY_CHECK_RESULT(ret, INKY_OK);
 
 	/* Put display to sleep */
 	ret = _spi_send_command_byte(cfg, ENTER_DEEP_SLEEP, 0x01);
-	INKY_CHECK_RESULT(ret, OK);
+	INKY_CHECK_RESULT(ret, INKY_OK);
 
-	return OK;
+	return INKY_OK;
 }
 
 inky_error_state inky_update_by_mode(inky_config *cfg,
 				     inky_fb_type update_type)
 {
-	/* TODO: Implement function to update, overriding configure
+	/** @todo Implement function to update, overriding configure
 	 * mode */
 }
 
@@ -402,8 +411,8 @@ inky_error_state inky_clear(inky_config *cfg)
 
 		for (UINT16_t w = 0; w < cfg->fb->width; w++) {
 
-			ret = inky_fb_set_pixel(cfg, w, h, WHITE);
-			INKY_CHECK_RESULT(ret, OK);
+			ret = inky_fb_set_pixel(cfg, w, h, INKY_COLOR_WHITE);
+			INKY_CHECK_RESULT(ret, INKY_OK);
 
 		}
 
@@ -411,9 +420,9 @@ inky_error_state inky_clear(inky_config *cfg)
 
 	/* Write zeroed framebuffer to display */
 	ret = inky_update(cfg);
-	INKY_CHECK_RESULT(ret, OK);
+	INKY_CHECK_RESULT(ret, INKY_OK);
 
-	return OK;
+	return INKY_OK;
 }
 
 /*
@@ -426,7 +435,7 @@ static inky_error_state _spi_send_data(inky_config *cfg,
 				       const UINT8_t *data,
 				       UINT32_t len)
 {
-	return cfg->spi_write_cb(data, len);
+	return cfg->spi_write_cb(data, len, cfg->intf_ptr);
 }
 
 static inky_error_state _spi_send_command(inky_config *cfg, dcommand cmd,
@@ -434,9 +443,9 @@ static inky_error_state _spi_send_command(inky_config *cfg, dcommand cmd,
 {
 	inky_error_state ret;
 
-	ret = cfg->spi_write_cb((UINT8_t*) &cmd, 1);
+	ret = cfg->spi_write_cb((UINT8_t*) &cmd, 1, cfg->intf_ptr);
 
-	if (ret != OK) {
+	if (ret != INKY_OK) {
 		return ret;
 	}
 
@@ -445,7 +454,7 @@ static inky_error_state _spi_send_command(inky_config *cfg, dcommand cmd,
 		return ret;
 	}
 
-	return OK;
+	return INKY_OK;
 }
 
 static inky_error_state _spi_send_command_byte(inky_config *cfg,
@@ -454,9 +463,9 @@ static inky_error_state _spi_send_command_byte(inky_config *cfg,
 {
 	inky_error_state ret;
 
-	ret = cfg->spi_write_cb((UINT8_t*) &cmd, 1);
+	ret = cfg->spi_write_cb((UINT8_t*) &cmd, 1, cfg->intf_ptr);
 
-	if (ret != OK) {
+	if (ret != INKY_OK) {
 		return ret;
 	}
 
@@ -470,40 +479,42 @@ static inky_error_state _reset(inky_config *cfg)
 
 	if (!cfg->fb) {
 		/* Stop if not configured */
-		return NOT_CONFIGURED;
+		return INKY_E_NOT_CONFIGURED;
 	}
 
-	ret = cfg->gpio_output_cb(RESET_PIN, LOW);
+	ret = cfg->gpio_output_cb(INKY_PIN_RESET, INKY_PINSTATE_LOW,
+				  cfg->intf_ptr);
 
-	if (ret != OK) {
+	if (ret != INKY_OK) {
 		return ret;
 	}
 
-	cfg->delay_us_cb(100000);
-	cfg->gpio_output_cb(RESET_PIN, HIGH);
+	cfg->delay_us_cb(100000, cfg->intf_ptr);
+	cfg->gpio_output_cb(INKY_PIN_RESET, INKY_PINSTATE_HIGH,
+			    cfg->intf_ptr);
 
-	if (ret != OK) {
+	if (ret != INKY_OK) {
 		return ret;
 	}
 
-	cfg->delay_us_cb(100000);
+	cfg->delay_us_cb(100000, cfg->intf_ptr);
 
 	/* Send soft reset */
-	if ((ret =_spi_send_command(cfg, SOFT_RESET, NULL, 0)) != OK) {
+	if ((ret =_spi_send_command(cfg, SOFT_RESET, NULL, 0)) != INKY_OK) {
 		return ret;
 	}
 
 	/* Poll the busy pin, blocking until it returns */
-	if ((ret = _busy_wait(cfg)) != OK) {
+	if ((ret = _busy_wait(cfg)) != INKY_OK) {
 		return ret;
 	}
 
-	return OK;
+	return INKY_OK;
 }
 
 static inky_error_state _busy_wait(inky_config *cfg)
 {
-	return cfg->gpio_poll_cb(BUSY_PIN, 30000);
+	return cfg->gpio_poll_cb(INKY_PIN_BUSY, 30000, cfg->intf_ptr);
 }
 
 static inky_error_state _allocate_fb(inky_config *cfg)
@@ -511,13 +522,13 @@ static inky_error_state _allocate_fb(inky_config *cfg)
 	struct _display_res *dr;
 
 	if (cfg->fb) {
-		return OK;
+		return INKY_OK;
 	}
 
 	/*
 	 * Check the inky product name
-	 *
-	 * TODO: Does this really belong in frame buffer allocation?
+	 */
+	/** @todo Does this really belong in frame buffer allocation?
 	 */
 	switch (cfg->pdt) {
 	case INKY_WHAT:
@@ -527,14 +538,14 @@ static inky_error_state _allocate_fb(inky_config *cfg)
 		dr = &_inky_phat;
 		break;
 	default:
-		return NOT_AVAILABLE;
+		return INKY_E_NOT_AVAILABLE;
 		break;
 	}
 
 	cfg->fb = malloc(sizeof(inky_fb)); /* Must free with inky_free() */
 
 	if (!cfg->fb) {
-		return OUT_OF_MEMORY;
+		return INKY_E_OUT_OF_MEMORY;
 	}
 
 	/*
@@ -573,7 +584,7 @@ static inky_error_state _allocate_fb(inky_config *cfg)
 	cfg->fb->buffer = malloc(cfg->fb->bytes); /* Must free with inky_free() */
 
 	if (!cfg->fb->buffer) {
-		return OUT_OF_MEMORY;
+		return INKY_E_OUT_OF_MEMORY;
 	}
 
 	/* Initialize framebuffer with zeros */
@@ -590,16 +601,16 @@ static inky_error_state _allocate_fb(inky_config *cfg)
 	 *
 	 */
 	if ((cfg->exclude_flags & INKY_FLAG_REFRESH_ALWAYS & INKY_FLAG_NO_DIFF) != 0) {
-		cfg->fb->fb_type = REFRESH_DIFF;
+		cfg->fb->fb_type = INKY_FB_REFRESH_DIFF;
 	} else if ((cfg->exclude_flags & INKY_FLAG_REFRESH_ALWAYS) != 0) {
-		cfg->fb->fb_type = OVERLAY;
+		cfg->fb->fb_type = INKY_FB_OVERLAY;
 	} else {
-		cfg->fb->fb_type = REFRESH_ALWAYS;
+		cfg->fb->fb_type = INKY_FB_REFRESH_ALWAYS;
 	}
 
 	cfg->active_fb = NULL;
 
-	return OK;
+	return INKY_OK;
 }
 
 static UINT8_t* _spi_order_bytes(UINT16_t input, UINT8_t* result) {
@@ -630,7 +641,7 @@ static inky_error_state _inky_prep(inky_config *cfg,
 	}
 
 	if (!_spi_order_bytes(cfg->fb->height, height_byte_array))
-		return NULL_PTR;
+		return INKY_E_NULL_PTR;
 
 	/* Use command sequence from Pimoroni's Inky library */
 	_spi_send_command_byte(cfg, ANALOG_BLOCK_CONTROL, 0x54);
@@ -662,7 +673,7 @@ static inky_error_state _inky_prep(inky_config *cfg,
 
 	/* Support for different update modes will be added later */
 	switch (cfg->fb->fb_type) {
-	case REFRESH_ALWAYS:
+	case INKY_FB_REFRESH_ALWAYS:
 		if (cfg->color->yellow) {
 			_spi_send_command(cfg, SET_LUTS,
 					  lut_yellow_refresh,
@@ -680,9 +691,9 @@ static inky_error_state _inky_prep(inky_config *cfg,
 
 		break;
 	default:
-		return NOT_AVAILABLE;
+		return INKY_E_NOT_AVAILABLE;
 		break;
 	}
 
-	return OK;
+	return INKY_OK;
 }

@@ -129,8 +129,8 @@ extern "C" {
 							void*);
 
 /** @brief inky_user_spi_write_16
- *  @param UINT16_t buf: ptr to buffer to write
- *  @param UINT32_t len: length of buffer to write
+ *  @param buf ptr to buffer to write
+ *  @param len length of buffer to write
  */
 	typedef inky_error_state (*inky_user_spi_write_16)(UINT16_t*,
 							   UINT32_t,
@@ -211,6 +211,7 @@ extern "C" {
 		inky_user_spi_write spi_write_cb; /* SPI 8 bit array write callback */
 		inky_user_spi_write_16 spi_write16_cb; /* SPI 16 bit array write callback */
 		inky_user_delay delay_us_cb; /* Delay callback with time in us */
+		void *intf_ptr;
 		void *usrptr1; /* Optional usrptr. Pass void if not needed */
 		void *usrptr2; /* Optional usrptr. Pass void if not needed */
 	} inky_config;

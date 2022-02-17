@@ -10,6 +10,16 @@
 ************************* API Definitions ****************************
 **********************************************************************
 */
+
+/**
+ * @defgroup inkydisplayapi INKY Display API
+ * @{
+ */
+
+/**
+ * @defgroup inkyintoverides Integer overides
+ * @{
+ */
 #ifndef INT8_t
 #define INT8_t int8_t
 #endif
@@ -34,6 +44,16 @@
 #define UINT32_t uint32_t
 #endif
 
+/**
+ * @}
+ * Intgeger overides
+ */
+
+/**
+ * @defgroup inkysetupflags Inky Setup Flags
+ * @{
+ */
+
 /* Setup flags, on by default */
 #define INKY_FLAG_MAP_COLORS		0x0001
 #define INKY_FLAG_ALLOCATE_FB		0x0002
@@ -43,7 +63,12 @@
 #define INKY_SPI_SPEED_HZ_MAX		800000
 #define INKY_SPI_BITS_DEFAULT		8
 
-/** @defgroup Inky error states
+/**
+ * @}
+ * Inky Setup Flags
+ */
+
+/** @defgroup inkyerrorstates Inky error states
  * @{
  */
 
@@ -66,7 +91,10 @@
 extern "C" {
 #endif /* #ifdef __cplusplus */
 
-/* GPIO pins */
+/**
+ * @defgroup inkygpiocfg GPIO pin configuration enums
+ * @{
+ */
 	typedef enum {
 		/* GPIO Pins */
 		INKY_PIN_RESET,
@@ -94,6 +122,16 @@ extern "C" {
 		INKY_PINSTATE_HIGH = 1,
 		INKY_PINSTATE_INPUT
 	} inky_pin_state;
+
+/**
+ * @}
+ * GPIO pin configuration enums
+ */
+
+/**
+ * @defgroup inkycbtypes Types for user callback functions
+ * @{
+ */
 
 	typedef int8_t inky_error_state;
 
@@ -132,18 +170,23 @@ extern "C" {
  *  @param buf ptr to buffer to write
  *  @param len length of buffer to write
  */
-	typedef inky_error_state (*inky_user_spi_write_16)(UINT16_t*,
+	typedef inky_error_state (*inky_user_spi_write_16)(const UINT16_t*,
 							   UINT32_t,
 							   void*);
 
-/* Inky definitions */
+/**
+ * @}
+ * Types for user callback functiosn
+ */
+
+/** @brief Inky definitions */
 	typedef enum {
 		INKY_WHAT,
 		INKY_PHAT,
 		INKY_CUSTOM
 	} inky_product;
 
-/* Colors various inkies can handle */
+/** @brief Colors various inkies can handle */
 	typedef enum {
 		INKY_COLOR_WHITE = 0,
 		INKY_COLOR_BLACK = 1,
@@ -151,7 +194,7 @@ extern "C" {
 		INKY_COLOR_YELLOW = 3
 	} inky_color;
 
-/* Define the available colors in this struct, 1 on, 0 off */
+/** @brief Define the available colors in this struct, 1 on, 0 off */
 	typedef struct inky_color_confignode {
 		UINT8_t white;
 		UINT8_t black;
@@ -203,17 +246,17 @@ extern "C" {
 		inky_fb *active_fb;
 		inky_flags exclude_flags;
 		inky_user_gpio_initialize gpio_init_cb;
-		inky_user_gpio_setup_pin gpio_setup_pin_cb; /* GPIO pin config callback */
-		inky_user_gpio_output_state gpio_output_cb; /* GPIO set output callback */
-		inky_user_gpio_input_state gpio_input_cb; /* GPIO set input callback */
-		inky_user_gpio_poll_pin gpio_poll_cb; /* Callback to wait for pin */
-		inky_user_spi_setup spi_setup_cb; /* SPI setup callback */
-		inky_user_spi_write spi_write_cb; /* SPI 8 bit array write callback */
-		inky_user_spi_write_16 spi_write16_cb; /* SPI 16 bit array write callback */
-		inky_user_delay delay_us_cb; /* Delay callback with time in us */
-		void *intf_ptr;
-		void *usrptr1; /* Optional usrptr. Pass void if not needed */
-		void *usrptr2; /* Optional usrptr. Pass void if not needed */
+		inky_user_gpio_setup_pin gpio_setup_pin_cb; /**< GPIO pin config callback */
+		inky_user_gpio_output_state gpio_output_cb; /**< GPIO set output callback */
+		inky_user_gpio_input_state gpio_input_cb; /**< GPIO set input callback */
+		inky_user_gpio_poll_pin gpio_poll_cb; /**< Callback to wait for pin */
+		inky_user_spi_setup spi_setup_cb; /**< SPI setup callback */
+		inky_user_spi_write spi_write_cb; /**< SPI 8 bit array write callback */
+		inky_user_spi_write_16 spi_write16_cb; /**< SPI 16 bit array write callback */
+		inky_user_delay delay_us_cb; /**< Delay callback with time in us */
+		void *intf_ptr; /**< Pointer user interface object */
+		void *usrptr1; /**< Optional usrptr. Pass NULL if not needed */
+		void *usrptr2; /**< Optional usrptr. Pass NULL if not needed */
 	} inky_config;
 
 /** @brief Setup Function */
@@ -244,4 +287,10 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif /* #ifdef __cplusplus */
+
+/**
+ * @}
+ * INKY Display API
+ */
+
 #endif /* #ifndef INKY_API_H */

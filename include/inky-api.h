@@ -270,8 +270,8 @@ extern "C" {
 					       UINT8_t pos, void *ptr);
 
 /** @brief Set pixel color in fb */
-	inky_error_state inky_fb_set_pixel(inky_config *cfg, UINT8_t x,
-					   UINT8_t y, inky_color c);
+	inky_error_state inky_fb_set_pixel(inky_config *cfg, UINT16_t x,
+					   UINT16_t y, inky_color c);
 
 /** @brief Update Inky screen to current fb state using config update
  * mode */

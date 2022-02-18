@@ -174,8 +174,8 @@ inky_error_state inky_fb_usrptr_attach(inky_config *cfg, UINT8_t pos,
 	return INKY_OK;
 }
 
-inky_error_state inky_fb_set_pixel(inky_config *cfg, UINT8_t x,
-				   UINT8_t y, inky_color c)
+inky_error_state inky_fb_set_pixel(inky_config *cfg, UINT16_t x,
+				   UINT16_t y, inky_color c)
 {
 	UINT16_t byte_addr;
 	UINT8_t bit_addr;

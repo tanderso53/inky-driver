@@ -10,6 +10,12 @@
 
 #include <stdint.h>
 
+/**
+ * @defgroup pimoroni-inky-fb-tests Pimoroni Inky Framebuffer testing
+ * suites
+ * @{
+ */
+
 #define INTF(ptr)				\
 	struct test_intf *intf = (struct test_intf*) ptr;
 
@@ -509,3 +515,8 @@ int main(int argc, char *const argv[])
 
 	return munit_suite_main(&inky_suite, (void*) &intf, argc, argv);
 }
+
+/**
+ * @}
+ * defgroup pimoroni-inky-fb-tests
+ */

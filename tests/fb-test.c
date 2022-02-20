@@ -9,12 +9,19 @@
 #include <munit/munit.h>
 
 #include <stdint.h>
+#include <string.h>
 
 /**
  * @defgroup pimoroni-inky-fb-tests Pimoroni Inky Framebuffer testing
  * suites
  * @{
  */
+
+/*
+**********************************************************************
+************************** TESTS DEFINITIONS *************************
+**********************************************************************
+*/
 
 #define INTF(ptr)				\
 	struct test_intf *intf = (struct test_intf*) ptr;
@@ -29,6 +36,56 @@ struct test_intf {
 	void *usrptr;
 	uint8_t *buf;
 };
+
+static char* inky_color_params[] = {
+	"black",
+	"red",
+	"yellow",
+	NULL
+};
+
+static char* inky_pdt_params[] = {
+	"what",
+	"phat",
+	"custom",
+	NULL
+};
+
+static MunitParameterEnum fb_test_params[] = {
+	{
+		.name = "color",
+		.values = inky_color_params
+	},
+
+	{
+		.name = "product",
+		.values = inky_pdt_params
+	},
+
+	{
+		.name = NULL,
+		.values = NULL
+	}
+};
+
+inky_color color_from_char(const char* color);
+
+inky_product pdt_from_char(const char* pdt);
+
+void deinitialize_test_device(struct test_intf *intf);
+
+void initialize_test_device(struct test_intf *intf, inky_color color_type,
+			    inky_product product);
+
+void destroy_random_image(uint8_t *img_buf);
+
+uint32_t create_random_image(struct test_intf * intf);
+
+/*
+**********************************************************************
+********************** TESTS IMPLEMENTATION **************************
+**********************************************************************
+*/
 
 inky_error_state inky_tests_gpio_initialize(void *intf_ptr)
 {
@@ -131,18 +188,19 @@ inky_error_state inky_tests_spi_write16(const uint16_t* buf, uint32_t len,
 	return INKY_OK;
 }
 
-void initialize_test_device(struct test_intf *intf)
+void initialize_test_device(struct test_intf *intf, inky_color color_type,
+			    inky_product product)
 {
 	inky_config *dev = &intf->dev;
 
-	/* Only INKY_WHAT is currently supported */
-	dev->pdt = INKY_WHAT;
+	/* Select the inky product to configure */
+	dev->pdt = product;
 
 	/* Set up colors */
 	intf->color.white = 1;
-	intf->color.red = 1;
+	intf->color.red = color_type == INKY_COLOR_RED ? 1 : 0;
 	intf->color.black = 1;
-	intf->color.yellow = 0;
+	intf->color.yellow = color_type == INKY_COLOR_YELLOW ? 1 : 0;
 
 	/* Set interface ptr */
 	dev->intf_ptr = (void*) intf;
@@ -222,6 +280,48 @@ void destroy_random_image(uint8_t *img_buf)
 	free(img_buf);
 }
 
+inky_color color_from_char(const char* color)
+{
+	if (strcmp(color, "black") == 0) {
+
+		return INKY_COLOR_BLACK;
+
+	} else if (strcmp(color, "red") == 0) {
+
+		return INKY_COLOR_RED;
+
+	} else if (strcmp(color, "yellow") == 0) {
+
+		return INKY_COLOR_YELLOW;
+
+	}
+
+	munit_errorf("Color %s is invalid", color);
+
+	return INKY_COLOR_BLACK;
+}
+
+inky_product pdt_from_char(const char* pdt)
+{
+	if (strcmp(pdt, "what") == 0) {
+
+		return INKY_WHAT;
+
+	} else if (strcmp(pdt, "phat") == 0) {
+
+		return INKY_PHAT;
+
+	} else if (strcmp(pdt, "custom") == 0) {
+
+		return INKY_CUSTOM;
+
+	}
+
+	munit_errorf("Inky Product %s is invalid", pdt);
+
+	return INKY_CUSTOM;
+}
+
 /**
  * @defgroup inky-init-test Test inky initialization
  * @{
@@ -231,8 +331,13 @@ static void *inky_init_setup(const MunitParameter params[],
 			     void *user_data)
 {
 	INTF(user_data);
+	inky_color c;
+	inky_product p;
 
-	initialize_test_device(intf);
+	c = color_from_char(munit_parameters_get(params, "color"));
+	p = pdt_from_char(munit_parameters_get(params, "product"));
+
+	initialize_test_device(intf, c, p);
 
 	return user_data;
 }
@@ -270,8 +375,13 @@ static void *inky_clear_setup(const MunitParameter params[],
 			     void *user_data)
 {
 	INTF(user_data);
+	inky_color c;
+	inky_product p;
 
-	initialize_test_device(intf);
+	c = color_from_char(munit_parameters_get(params, "color"));
+	p = pdt_from_char(munit_parameters_get(params, "product"));
+
+	initialize_test_device(intf, c, p);
 
 	return user_data;
 }
@@ -313,8 +423,13 @@ static void *fb_usrptr_setup(const MunitParameter params[],
 	int arr_len = 8;
 
 	INTF(user_data);
+	inky_color c;
+	inky_product p;
 
-	initialize_test_device(intf);
+	c = color_from_char(munit_parameters_get(params, "color"));
+	p = pdt_from_char(munit_parameters_get(params, "product"));
+
+	initialize_test_device(intf, c, p);
 
 	intf->buf = munit_malloc(arr_len);
 
@@ -382,8 +497,13 @@ static void *random_fb_setup(const MunitParameter params[],
 			     void *user_data)
 {
 	INTF(user_data);
+	inky_color c;
+	inky_product p;
 
-	initialize_test_device(intf);
+	c = color_from_char(munit_parameters_get(params, "color"));
+	p = pdt_from_char(munit_parameters_get(params, "product"));
+
+	initialize_test_device(intf, c, p);
 
 	return user_data;
 }
@@ -456,48 +576,48 @@ MunitResult random_fb_test(const MunitParameter params[],
 
 MunitTest fb_tests[] = {
 	{
-		"/inky-init-test",
-		inky_init_test,
-		inky_init_setup,
-		inky_init_tear_down,
-		MUNIT_TEST_OPTION_NONE,
-		NULL
+		.name = "/inky-init-test",
+		.test = inky_init_test,
+		.setup = inky_init_setup,
+		.tear_down = inky_init_tear_down,
+		.options = MUNIT_TEST_OPTION_NONE,
+		.parameters = fb_test_params
 	},
 
 	{
-		"/inky-clear-test",
-		inky_clear_test,
-		inky_clear_setup,
-		inky_clear_tear_down,
-		MUNIT_TEST_OPTION_NONE,
-		NULL
+		.name = "/inky-clear-test",
+		.test = inky_clear_test,
+		.setup = inky_clear_setup,
+		.tear_down = inky_clear_tear_down,
+		.options = MUNIT_TEST_OPTION_NONE,
+		.parameters = fb_test_params
 	},
 
 	{
-		"/fb-usrptr-test",
-		fb_usrptr_test,
-		fb_usrptr_setup,
-		fb_usrptr_tear_down,
-		MUNIT_TEST_OPTION_NONE,
-		NULL
+		.name = "/fb-usrptr-test",
+		.test = fb_usrptr_test,
+		.setup = fb_usrptr_setup,
+		.tear_down = fb_usrptr_tear_down,
+		.options = MUNIT_TEST_OPTION_NONE,
+		.parameters = fb_test_params
 	},
 
 	{
-		"/random-fb-test",
-		random_fb_test,
-		random_fb_setup,
-		random_fb_tear_down,
-		MUNIT_TEST_OPTION_NONE,
-		NULL
+		.name ="/random-fb-test",
+		.test = random_fb_test,
+		.setup = random_fb_setup,
+		.tear_down = random_fb_tear_down,
+		.options = MUNIT_TEST_OPTION_NONE,
+		.parameters = fb_test_params
 	},
 
 	{
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		MUNIT_TEST_OPTION_NONE,
-		NULL
+		.name = NULL,
+		.test = NULL,
+		.setup = NULL,
+		.tear_down = NULL,
+		.options = MUNIT_TEST_OPTION_NONE,
+		.parameters = NULL
 	}
 };
 

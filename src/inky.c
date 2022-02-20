@@ -231,8 +231,8 @@ inky_error_state inky_fb_set_pixel(inky_config *cfg, UINT16_t x,
 		mask = 0x01 << bit_addr;
 		*byte_rst = *byte_rst | mask;
 
-		mask = 0x02 << bit_addr;
-		*byte_rst = *byte_rst ^ mask;
+		mask = ~ (0x02 << bit_addr);
+		*byte_rst = *byte_rst & mask;
 
 		break;
 
@@ -242,8 +242,8 @@ inky_error_state inky_fb_set_pixel(inky_config *cfg, UINT16_t x,
 			return INKY_E_NOT_AVAILABLE;
 		}
 
-		mask = 0x03 << bit_addr;
-		*byte_rst = *byte_rst ^ mask;
+		mask = ~ (0x03 << bit_addr);
+		*byte_rst = *byte_rst & mask;
 
 		break;
 
@@ -256,8 +256,8 @@ inky_error_state inky_fb_set_pixel(inky_config *cfg, UINT16_t x,
 		mask = 0x02 << bit_addr;
 		*byte_rst = *byte_rst | mask;
 
-		mask = 0x01 << bit_addr;
-		*byte_rst = *byte_rst ^ mask;
+		mask = ~ (0x01 << bit_addr);
+		*byte_rst = *byte_rst & mask;
 
 		break;
 
@@ -270,8 +270,8 @@ inky_error_state inky_fb_set_pixel(inky_config *cfg, UINT16_t x,
 		mask = 0x02 << bit_addr;
 		*byte_rst = *byte_rst | mask;
 
-		mask = 0x01 << bit_addr;
-		*byte_rst = *byte_rst ^ mask;
+		mask = ~ (0x01 << bit_addr);
+		*byte_rst = *byte_rst & mask;
 
 		break;
 

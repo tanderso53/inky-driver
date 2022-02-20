@@ -1,0 +1,19 @@
+build:
+    stage: build
+    script:
+        - cmake -DPIMORONI_INKY_BUILD_TESTING=true -DPIMORONI_INKY_BUILD_INST_CODE=true -S . -B build
+        - cmake --build build
+    artifacts:
+        paths:
+            - build
+        expire_in: 1 day
+test:
+    stage: test
+    script:
+        - cd build
+        - make inky-fb-test-coverage
+    artifacts:
+        paths:
+            - build/coverage.json
+        expire_in: 1 day
+    coverage: '/Coverage: \d+\.\d+/'

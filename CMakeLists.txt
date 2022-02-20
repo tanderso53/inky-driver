@@ -46,6 +46,10 @@ if(PIMORONI_INKY_BUILD_TESTING)
   target_include_directories(inky-fb-test PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/lib)
 
+  target_compile_options(inky-fb-test PRIVATE -Wall -g)
+
+  target_compile_options(pimoroni-inky-driver INTERFACE -Wall -g)
+
   add_test(NAME pimoroni-inky-test-suite
     COMMAND $<TARGET_FILE:inky-fb-test>)
 
@@ -69,7 +73,7 @@ if(PIMORONI_INKY_BUILD_TESTING)
     add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
 
     add_custom_target(inky-fb-test-coverage
-      LLVM_PROFILE_FILE=coverage.profraw $<TARGET_FILE:inky-fb-test>
+      LLVM_PROFILE_FILE=coverage.profraw $<TARGET_FILE:inky-fb-test> --no-fork
       COMMAND ${PROFILER} merge -sparse coverage.profraw -o coverage.profdata
       COMMAND ${LCOV} export $<TARGET_FILE:inky-fb-test>
       -instr-profile=coverage.profdata > coverage.json

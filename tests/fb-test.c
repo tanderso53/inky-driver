@@ -235,7 +235,7 @@ static void inky_init_tear_down(void *fixture)
 {
 	INTF(fixture);
 
-	inky_free(fixture);
+	inky_free(&intf->dev);
 
 	deinitialize_test_device(intf);
 }
@@ -274,7 +274,7 @@ static void inky_clear_tear_down(void *fixture)
 {
 	INTF(fixture);
 
-	inky_free(fixture);
+	inky_free(&intf->dev);
 
 	deinitialize_test_device(intf);
 }
@@ -323,7 +323,7 @@ static void fb_usrptr_tear_down(void *fixture)
 {
 	INTF(fixture);
 
-	inky_free(fixture);
+	inky_free(&intf->dev);
 
 	free(intf->buf);
 
@@ -388,7 +388,7 @@ static void random_fb_tear_down(void *fixture)
 
 	destroy_random_image((uint8_t*) intf->usrptr);
 
-	inky_free(fixture);
+	inky_free(&intf->dev);
 
 	deinitialize_test_device(intf);
 }

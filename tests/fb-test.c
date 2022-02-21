@@ -547,9 +547,19 @@ MunitResult random_fb_test(const MunitParameter params[],
 				   "to (%u,%u)",
 				   pixel, addr, x, y);
 
-			if (pixel == 1) c = INKY_COLOR_BLACK;
-			else if (pixel == 0) c = INKY_COLOR_WHITE;
-			else c = INKY_COLOR_RED;
+			if (pixel == 1) {
+
+				c = INKY_COLOR_BLACK;
+
+			} else if (pixel == 0) {
+
+				c = INKY_COLOR_WHITE;
+
+			} else {
+
+				c = color_from_char(munit_parameters_get(params, "color"));
+
+			}
 
 			munit_assert_int8(inky_fb_set_pixel(dev, x, y, c),
 					  ==, INKY_OK);

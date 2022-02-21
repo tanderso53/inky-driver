@@ -47,7 +47,6 @@ static char* inky_color_params[] = {
 static char* inky_pdt_params[] = {
 	"what",
 	"phat",
-	"custom",
 	NULL
 };
 

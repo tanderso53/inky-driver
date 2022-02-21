@@ -7,6 +7,28 @@ Pimoroni Ltd. (see link below).
 Pimoroni and Inky are trademarks of Pimoroni Ltd. The author(s) of
 this project are not affiliated with or endorsed by Pimoroni Ltd.
 
+## Introduction
+
+Pimoroni Ltd. provides a range of small E-ink displays perfect for
+maker projects; however, the drivers supplied by Pimoroni Ltd. are
+limited to Raspberry Pi systems running Raspbian.
+
+This project intends to provide a driver interface to Pimoroni Inky
+displays that can be adapted to any system with SPI and a working
+C standard library implementation.
+
+This library will not only implement the features present in the
+original Python library, but it will eventually extend the original
+functionality with the following features:
+
+- Update only changed regions
+- Overwrite only mode
+- Character framebuffers
+
+Note that these features will be implemented in the future once the
+driver has verified all the functionality of the original Python
+library written by Pimoroni Ltd.
+
 ## License
 
 This library is Copyright 2022 Tyler J. Anderson and is free and open

@@ -435,6 +435,16 @@ static inky_error_state _spi_send_data(inky_config *cfg,
 				       const UINT8_t *data,
 				       UINT32_t len)
 {
+	inky_error_state ret;
+
+	/* Set DC pin to HIGH to signal the start of data */
+	ret = cfg->gpio_output_cb(INKY_PIN_DC, INKY_PINSTATE_HIGH,
+				  cfg->intf_ptr);
+
+	if (ret != INKY_OK) {
+		return ret;
+	}
+
 	return cfg->spi_write_cb(data, len, cfg->intf_ptr);
 }
 
@@ -442,6 +452,14 @@ static inky_error_state _spi_send_command(inky_config *cfg, dcommand cmd,
 					  const UINT8_t *data, UINT32_t len)
 {
 	inky_error_state ret;
+
+	/* Set DC pin to LOW to signal the command byte */
+	ret = cfg->gpio_output_cb(INKY_PIN_DC, INKY_PINSTATE_LOW,
+				  cfg->intf_ptr);
+
+	if (ret != INKY_OK) {
+		return ret;
+	}
 
 	ret = cfg->spi_write_cb((UINT8_t*) &cmd, 1, cfg->intf_ptr);
 
@@ -462,6 +480,14 @@ static inky_error_state _spi_send_command_byte(inky_config *cfg,
 					       UINT8_t arg)
 {
 	inky_error_state ret;
+
+	/* Set DC pin to LOW to signal the command byte */
+	ret = cfg->gpio_output_cb(INKY_PIN_DC, INKY_PINSTATE_LOW,
+				  cfg->intf_ptr);
+
+	if (ret != INKY_OK) {
+		return ret;
+	}
 
 	ret = cfg->spi_write_cb((UINT8_t*) &cmd, 1, cfg->intf_ptr);
 
@@ -514,7 +540,7 @@ static inky_error_state _reset(inky_config *cfg)
 
 static inky_error_state _busy_wait(inky_config *cfg)
 {
-	return cfg->gpio_poll_cb(INKY_PIN_BUSY, 30000, cfg->intf_ptr);
+	return cfg->gpio_poll_cb(INKY_PIN_BUSY, 30000000, cfg->intf_ptr);
 }
 
 static inky_error_state _allocate_fb(inky_config *cfg)

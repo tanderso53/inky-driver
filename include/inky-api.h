@@ -44,6 +44,10 @@
 #define UINT32_t uint32_t
 #endif
 
+#ifndef UINT64_t
+#define UINT64_t uint64_t
+#endif
+
 /**
  * @}
  * Intgeger overides
@@ -60,7 +64,7 @@
 #define INKY_FLAG_REFRESH_ALWAYS	0x0004
 #define INKY_FLAG_NO_DIFF		0x0008
 
-#define INKY_SPI_SPEED_HZ_MAX		800000
+#define INKY_SPI_SPEED_HZ_MAX		488000
 #define INKY_SPI_BITS_DEFAULT		8
 
 /**
@@ -149,7 +153,7 @@ extern "C" {
 							       inky_pin_state*,
 							       void*);
 	typedef inky_error_state (*inky_user_gpio_poll_pin)(inky_pin,
-							    UINT16_t,
+							    UINT64_t,
 							    void*);
 
 /* SPI function pointer types to be set by user */

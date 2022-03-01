@@ -78,7 +78,8 @@ static inky_error_state _busy_wait(inky_config *cfg);
 
 static inky_error_state _allocate_fb(inky_config *cfg);
 
-static UINT8_t* _spi_order_bytes(UINT16_t input, UINT8_t* result);
+static UINT8_t* _spi_order_bytes(UINT16_t input, UINT8_t* result,
+				 UINT8_t msb_first);
 
 static inky_error_state _inky_prep(inky_config *cfg,
 				   UINT8_t *height_byte_array);
@@ -349,9 +350,14 @@ inky_error_state inky_update(inky_config *cfg)
 
 			if (row_color[j] > 0)
 				sweep_color = 1;
+
+			/* Check to see if inverting colors will
+			 * create a white display */
+			row[j] = ~ row[j];
+			row_color[j] = ~ row_color[j];
 		}
 
-		if (!_spi_order_bytes(i, row_addr))
+		if (!_spi_order_bytes(i, row_addr, 0))
 			return INKY_E_NULL_PTR;
 
 		ret = _spi_send_command_byte(cfg, RAM_X_PTR_START, 0x00);
@@ -366,7 +372,7 @@ inky_error_state inky_update(inky_config *cfg)
 		INKY_CHECK_RESULT(ret, INKY_OK);
 
 		/* Write color row if it exists */
-		if (sweep_color) {
+		if (sweep_color | 1) {
 			_spi_send_command_byte(cfg, RAM_X_PTR_START, 0x00);
 			_spi_send_command(cfg, RAM_Y_PTR_START, row_addr, 2);
 
@@ -639,7 +645,8 @@ static inky_error_state _allocate_fb(inky_config *cfg)
 	return INKY_OK;
 }
 
-static UINT8_t* _spi_order_bytes(UINT16_t input, UINT8_t* result) {
+static UINT8_t* _spi_order_bytes(UINT16_t input, UINT8_t* result,
+				 UINT8_t msb_first) {
 	UINT8_t height_byte_little;
 	UINT8_t height_byte_big;
 
@@ -649,10 +656,15 @@ static UINT8_t* _spi_order_bytes(UINT16_t input, UINT8_t* result) {
 
 	/* Fit 16bit heights into 8bit message stream */
 	height_byte_little = (UINT8_t) (input & 0x00FF);
-	height_byte_big = (UINT8_t) ((input >> 2) & 0x00FF);
+	height_byte_big = (UINT8_t) ((input >> 8) & 0x00FF);
 
-	result[0] = height_byte_big;
-	result[1] = height_byte_little;
+	if (msb_first) {
+		result[0] = height_byte_big;
+		result[1] = height_byte_little;
+	} else {
+		result[0] = height_byte_little;
+		result[1] = height_byte_big;
+	}
 
 	return result;
 }
@@ -666,13 +678,18 @@ static inky_error_state _inky_prep(inky_config *cfg,
 		return ret;
 	}
 
-	if (!_spi_order_bytes(cfg->fb->height, height_byte_array))
+	if (!_spi_order_bytes(cfg->fb->height, height_byte_array, 1))
 		return INKY_E_NULL_PTR;
 
 	/* Use command sequence from Pimoroni's Inky library */
 	_spi_send_command_byte(cfg, ANALOG_BLOCK_CONTROL, 0x54);
 	_spi_send_command_byte(cfg, DIGITAL_BLOCK_CONTROL, 0x3b);
-	_spi_send_command(cfg, GATE_SETTING, height_byte_array, 3);
+	_spi_send_command(cfg, GATE_SETTING,
+			  (UINT8_t[]) {
+				  height_byte_array[1],
+				  height_byte_array[0],
+				  0x00
+			  }, 3);
 	_spi_send_command_byte(cfg, GATE_DRIVING_VOLTAGE, 0x17);
 	_spi_send_command(cfg, SOURCE_DRIVING_VOLTAGE,
 			  (UINT8_t[]) {0x41, 0xac, 0x32}, 3);
